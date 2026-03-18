@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MyThott</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #0f0f13;
+            color: #e8e6e0;
+            font-family: system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Topbar ── */
+        .topbar {
+            padding: 12px 24px;
+            border-bottom: 0.5px solid #2a2830;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-shrink: 0;
+        }
+        .logo { font-size: 16px; font-weight: 600; color: #6c8ebf; letter-spacing: 0.03em; flex-shrink: 0; }
+        .config-label {
+            font-size: 12px; color: #999;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            flex: 1;
+        }
+        .config-label span { color: #bbb; margin-right: 14px; }
+        .config-label span:last-child { margin-right: 0; }
+        .btn-settings {
+            background: transparent; border: 0.5px solid #3a3848;
+            color: #aaa; border-radius: 6px; padding: 4px 10px;
+            font-size: 12px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .btn-settings:hover  { border-color: #6c8ebf; color: #6c8ebf; }
+        .btn-settings.active { border-color: #6c8ebf; color: #6c8ebf; background: #12182a; }
+        .session-label { font-size: 11px; color: #777; flex-shrink: 0; }
+
+        /* ── Layout principal ── */
+        .main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+        /* ── Panneau de configuration ── */
+        .settings-panel {
+            flex: 1; overflow-y: auto;
+            padding: 28px 28px 16px;
+            display: flex; flex-direction: column; gap: 20px;
+        }
+        .settings-panel.hidden { display: none; }
+        .settings-intro { font-size: 13px; color: #aaa; line-height: 1.6; }
+
+        .settings-grid { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+        .setting-card {
+            flex: 1; min-width: 200px;
+            background: #17151f; border: 0.5px solid #2a2830;
+            border-radius: 10px; padding: 16px;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .setting-card-title {
+            font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+            text-transform: uppercase; color: #6c8ebf;
+        }
+        .setting-select {
+            background: #0f0f13; border: 0.5px solid #2a2830;
+            border-radius: 6px; color: #e8e6e0;
+            font-size: 13px; padding: 6px 10px; width: 100%;
+            cursor: pointer; appearance: none;
+        }
+        .setting-select:focus { outline: none; border-color: #4a4260; }
+        .setting-select:hover { border-color: #4a4260; }
+        .setting-sep { font-size: 11px; color: #666; text-align: center; }
+        .setting-textarea {
+            background: #0f0f13; border: 0.5px solid #2a2830;
+            border-radius: 6px; color: #ddd;
+            font-size: 11px; font-family: monospace;
+            padding: 8px 10px; resize: vertical;
+            line-height: 1.5; min-height: 90px; outline: none; width: 100%;
+        }
+        .setting-textarea:focus       { border-color: #4a4260; }
+        .setting-textarea::placeholder { color: #555; }
+        .btn-apply {
+            background: transparent; border: 0.5px solid #3a3260;
+            color: #6c8ebf; border-radius: 6px;
+            padding: 5px 12px; font-size: 12px; cursor: pointer;
+            align-self: flex-start; transition: all 0.15s;
+        }
+        .btn-apply:hover { border-color: #6c8ebf; background: #12182a; }
+        .setting-hint { font-size: 11px; color: #888; line-height: 1.5; }
+
+        /* ── Historique chat ── */
+        .chat-history {
+            flex: 1; overflow-y: auto;
+            padding: 20px 28px 12px;
+            display: flex; flex-direction: column; gap: 18px;
+        }
+        .chat-history.hidden { display: none; }
+        .chat-history::-webkit-scrollbar { width: 4px; }
+        .chat-history::-webkit-scrollbar-track { background: transparent; }
+        .chat-history::-webkit-scrollbar-thumb { background: #2a2830; border-radius: 2px; }
+
+        .msg { display: flex; flex-direction: column; gap: 4px; }
+        .msg-role { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; }
+        .msg.bot  .msg-role { color: #6c8ebf; }
+        .msg.user .msg-role { color: #7aacdc; }
+        .msg-text { font-size: 14px; line-height: 1.75; color: #ffffff; }
+        .msg.user .msg-text { color: #ddeeff; }
+        .empty-state { color: #888; font-size: 14px; font-style: italic; }
+        .divider { height: 0.5px; background: #1a1820; flex-shrink: 0; }
+
+        /* ── Zone de saisie ── */
+        .input-section {
+            flex-shrink: 0; border-top: 0.5px solid #1e1c24;
+            padding: 10px 28px;
+        }
+        .input-area { display: flex; gap: 10px; align-items: stretch; }
+        .input-wrapper { position: relative; flex: 1; display: flex; }
+        .input-wrapper textarea {
+            flex: 1; background: #17151f; border: 0.5px solid #2a2830;
+            border-radius: 8px; color: #e8e6e0;
+            font-size: 14px; font-family: inherit;
+            padding: 10px 14px; resize: none;
+            line-height: 1.65; outline: none; min-height: 64px;
+        }
+        .input-wrapper textarea:focus    { border-color: #4a4260; }
+        .input-wrapper textarea::placeholder { color: #555; }
+        .char-counter {
+            position: absolute; bottom: 6px; right: 10px;
+            font-size: 10px; color: #555; pointer-events: none; transition: color 0.2s;
+        }
+        .char-counter.warn   { color: #c8901a; }
+        .char-counter.danger { color: #c83030; }
+
+        .btn-col { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+        .btn-send {
+            background: #6c8ebf; color: #0f0f13; border: none;
+            border-radius: 8px; padding: 0 20px; font-size: 13px;
+            font-weight: 600; cursor: pointer; flex: 1; white-space: nowrap;
+            transition: background 0.15s;
+        }
+        .btn-send:hover    { background: #7da3d6; }
+        .btn-send:active   { transform: scale(0.98); }
+        .btn-send:disabled { background: #1e2a3a; color: #4a6080; cursor: not-allowed; }
+
+        /* Bouton TTS */
+        .btn-tts {
+            background: transparent; border: 0.5px solid #3a3848;
+            color: #aaa; border-radius: 8px; padding: 0 14px;
+            font-size: 13px; cursor: pointer; flex: 1; white-space: nowrap;
+            transition: all 0.15s;
+        }
+        .btn-tts:hover   { border-color: #4a4260; color: #6c8ebf; }
+        .btn-tts.enabled { color: #6c8ebf; border-color: #3a5080; }
+        .btn-tts.playing { color: #6c8ebf; border-color: #6c8ebf; animation: pulse 1.2s infinite; }
+        /* État "en attente de clic" — autoplay bloqué par le navigateur */
+        .btn-tts.pending { color: #c8901a; border-color: #c8901a; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.55; } }
+
+        /* Bouton copier (messages bot) */
+        .btn-copy {
+            background: none; border: none; color: #555; font-size: 12px;
+            cursor: pointer; padding: 2px 6px; border-radius: 4px;
+            opacity: 0; transition: opacity 0.15s, color 0.15s;
+            align-self: flex-start; margin-top: 2px;
+        }
+        .msg:hover .btn-copy { opacity: 1; }
+        .btn-copy:hover { color: #aaa; }
+        .btn-copy.copied { color: #6c8ebf; opacity: 1; }
+
+        /* Bouton régénérer */
+        .btn-regen {
+            background: none; border: 0.5px solid #2a2830; color: #666;
+            font-size: 11px; cursor: pointer; padding: 3px 8px; border-radius: 4px;
+            align-self: flex-start; margin-top: 4px; transition: all 0.15s;
+        }
+        .btn-regen:hover { border-color: #4a4260; color: #aaa; }
+
+        /* Bouton micro STT */
+        .btn-mic {
+            background: transparent; border: 0.5px solid #3a3848;
+            color: #aaa; border-radius: 8px; padding: 0 14px;
+            font-size: 13px; cursor: pointer; flex: 1; white-space: nowrap;
+            transition: all 0.15s;
+        }
+        .btn-mic:hover       { border-color: #4a4260; color: #e8e6e0; }
+        .btn-mic.recording   { color: #c83030; border-color: #c83030; animation: pulse 1s infinite; }
+        .btn-mic.processing  { color: #c8901a; border-color: #c8901a; }
+
+        /* ── Statusbar ── */
+        .statusbar {
+            padding: 6px 28px; border-top: 0.5px solid #1a1820;
+            display: flex; gap: 16px; align-items: center; flex-shrink: 0;
+        }
+        .stat      { font-size: 11px; color: #888; }
+        .stat span { color: #ccc; }
+        .token-stat.warn   { color: #9a7020; }
+        .token-stat.warn   span { color: #e0a030; }
+        .token-stat.danger { color: #9a3020; }
+        .token-stat.danger span { color: #e05040; }
+        .btn-export {
+            font-size: 11px; color: #888; background: none; border: none;
+            cursor: pointer; padding: 2px 4px; text-decoration: none;
+        }
+        .btn-export:hover { color: #ccc; }
+        .btn-reset {
+            font-size: 11px; color: #774444; background: none;
+            border: none; cursor: pointer; padding: 2px 4px;
+        }
+        .btn-reset:hover { color: #c05050; }
+        .health-link { font-size: 11px; color: #888; text-decoration: none; }
+        .health-link:hover { color: #ccc; }
+    </style>
+</head>
+<body>
+
+<!-- ── Topbar ── -->
+<div class="topbar">
+    <div class="logo">MyThott</div>
+    <div class="config-label" id="config-label"></div>
+    <button class="btn-settings" id="settings-toggle">⚙ Paramètres</button>
+    <span class="session-label">session {{ session_id }}</span>
+</div>
+
+<!-- ── Zone principale ── -->
+<div class="main">
+
+    <!-- Panneau de configuration -->
+    <div class="settings-panel{% if history %} hidden{% endif %}" id="settings-panel">
+        <p class="settings-intro">Configurez votre assistant avant de commencer.</p>
+        <div class="settings-grid">
+
+            <!-- Expert (prompt) -->
+            <div class="setting-card">
+                <div class="setting-card-title">Expert</div>
+                <select class="setting-select" id="prompt-select"></select>
+                <div class="setting-sep">── ou collez votre propre prompt ──</div>
+                <textarea class="setting-textarea" id="custom-prompt-text"
+                    placeholder="Vous êtes un assistant spécialisé en…" style="display:none"></textarea>
+                <button class="btn-apply" id="btn-apply-prompt" style="display:none">Appliquer</button>
+                <p class="setting-hint" id="prompt-hint"></p>
+            </div>
+
+            <!-- Modèle -->
+            <div class="setting-card">
+                <div class="setting-card-title">Modèle LLM</div>
+                <select class="setting-select" id="model-select"></select>
+                <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
+                    <label style="font-size:11px;color:#888;white-space:nowrap">Température</label>
+                    <input type="range" id="temp-slider" min="0.1" max="1.5" step="0.1" value="0.7"
+                           style="flex:1;accent-color:#6c8ebf;cursor:pointer">
+                    <span id="temp-val" style="font-size:12px;color:#ccc;width:2.5em;text-align:right">0.7</span>
+                </div>
+                <p class="setting-hint">Modèle Ollama · Température basse = précis, haute = créatif.</p>
+            </div>
+
+            <!-- Voix -->
+            <div class="setting-card" id="voice-card">
+                <div class="setting-card-title">Voix TTS</div>
+                <select class="setting-select" id="voice-select"></select>
+                <p class="setting-hint" id="voice-hint">Voix Piper pour la synthèse vocale.
+                    La lecture audio est activée par défaut.</p>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Historique du chat -->
+    <div class="chat-history{% if not history %} hidden{% endif %}" id="chat-history">
+        {% if history %}
+            {% for msg in history %}
+                {% if not loop.first %}<div class="divider"></div>{% endif %}
+                <div class="msg {{ 'user' if msg.role == 'user' else 'bot' }} {{ 'bot-msg' if msg.role == 'assistant' else '' }}"
+                     {{ 'data-tts-auto="1"' | safe if (loop.last and msg.role == 'assistant') else '' }}>
+                    <div class="msg-role">{{ 'Vous' if msg.role == 'user' else 'Bot' }}</div>
+                    <div class="msg-text">{{ msg.content | replace('\n', '<br>') | safe }}</div>
+                    {% if msg.role == 'assistant' %}<button class="btn-copy" onclick="copyMsg(this)" title="Copier">⎘ copier</button>{% endif %}
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="empty-state">Commencez la conversation…</p>
+        {% endif %}
+    </div>
+
+    <!-- Zone de saisie -->
+    <div class="input-section">
+        <div class="input-area">
+            <form id="chat-form" action="/send" method="post" style="display:contents">
+                <input type="hidden" name="model"       id="model-input"  value="{{ default_model }}">
+                <input type="hidden" name="temperature" id="temp-input"   value="0.7">
+                <input type="hidden" name="regenerate"  id="regen-input"  value="false">
+                <div class="input-wrapper">
+                    <textarea id="msg-input" name="user_input" rows="3"
+                        placeholder="Votre message… (Ctrl+Entrée pour envoyer)" required></textarea>
+                    <span class="char-counter" id="char-counter"></span>
+                </div>
+                <div class="btn-col">
+                    <button type="submit" class="btn-send" id="send-btn">Envoyer</button>
+                    <button type="button" class="btn-send" id="stop-btn"
+                            style="display:none;background:#3a2020;color:#e05040"
+                            title="Arrêter la génération">⏹ Stop</button>
+                    <button type="button" class="btn-mic" id="mic-btn" title="Parler" style="display:none">🎤</button>
+                    <button type="button" class="btn-tts enabled" id="tts-btn">🔊</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── Statusbar ── -->
+<div class="statusbar">
+    <div class="stat">v{{ code_version }}</div>
+    <div class="stat" id="stat-msgs">msgs <span>{{ history | length }}</span></div>
+    {% if token_stats %}
+    <div class="stat token-stat {{ token_stats.level }}" id="stat-tokens"
+         title="{{ 'Valeur approximative — ajoutez « PARAMETER num_ctx N » dans votre Modelfile pour plus de précision' if token_stats.ctx_approx else 'Tokens utilisés dans la fenêtre de contexte' }}">
+        tokens <span>{{ token_stats.prompt_tokens }} / {{ '~' if token_stats.ctx_approx else '' }}{{ token_stats.ctx_size }}</span>
+        <span>({{ token_stats.pct }}%)</span>
+    </div>
+    {% else %}
+    <div class="stat token-stat ok" id="stat-tokens" style="display:none"></div>
+    {% endif %}
+    <a href="/export" id="btn-export" class="btn-export"
+       style="{{ '' if history else 'display:none' }}"
+       title="Télécharger la conversation en .txt">⬇ sauvegarder</a>
+    <form action="/reset" method="post" style="margin-left:auto">
+        <button type="submit" class="btn-reset" title="Réinitialiser la conversation (garde les paramètres)">↺ reset</button>
+    </form>
+    <a href="/health" class="health-link">health</a>
+</div>
+
+<script>
+    // ── État ──────────────────────────────────────────────────────────────────
+    const MAX_INPUT_LEN  = {{ max_input_len }};
+    const hasHistory     = {{ 'true' if history else 'false' }};
+    const currentPrompt  = "{{ current_prompt }}";
+    const defaultModel   = "{{ default_model }}";
+
+    const settingsPanel  = document.getElementById('settings-panel');
+    const chatHistory    = document.getElementById('chat-history');
+    const settingsToggle = document.getElementById('settings-toggle');
+    const modelInput     = document.getElementById('model-input');
+    const sendBtn        = document.getElementById('send-btn');
+    const ttsBtn         = document.getElementById('tts-btn');
+    const msgInput       = document.getElementById('msg-input');
+    const charCountEl    = document.getElementById('char-counter');
+
+    let settingsOpen    = !hasHistory;
+    let ttsEnabled      = localStorage.getItem('tts-enabled') !== 'false';
+    let currentAudio    = null;
+    let autoplayPending = false;
+    let streamAbort     = null;   // AbortController courant (stop streaming)
+    let lastUserText    = '';     // dernier message envoyé (pour régénérer)
+
+    // File d'attente TTS (streaming)
+    const ttsQueue      = [];
+    let ttsPlaying      = false;
+    let streamTtsBuf    = '';
+
+    // Détection de langue / voix adaptative
+    const voicesByLang  = {};   // { fr: ['fr_FR-gilles-low.onnx'], en: ['en_US-...'], ... }
+    let currentTtsLang  = 'fr'; // mis à jour à chaque réponse bot
+
+    // STT
+    const STT_MAX_SECONDS = 30;   // limite d'enregistrement
+    let mediaRecorder  = null;
+    let audioChunks    = [];
+    let isRecording    = false;
+    let recTimerId     = null;    // setTimeout pour auto-stop
+    let recTickId      = null;    // setInterval pour le compte à rebours
+
+    // ── Panneau paramètres ────────────────────────────────────────────────────
+    function setSettings(open) {
+        settingsOpen = open;
+        settingsPanel.classList.toggle('hidden', !open);
+        chatHistory.classList.toggle('hidden', open);
+        settingsToggle.classList.toggle('active', open);
+        settingsToggle.textContent = open ? '✕ Fermer' : '⚙ Paramètres';
+    }
+    settingsToggle.onclick = () => setSettings(!settingsOpen);
+
+    // ── Auto-scroll (chargement initial) ──────────────────────────────────────
+    const allMsgs = chatHistory.querySelectorAll('.msg');
+    if (allMsgs.length) {
+        allMsgs[allMsgs.length - 1].scrollIntoView({ block: 'start', behavior: 'instant' });
+    }
+
+    // ── Compteur de caractères ────────────────────────────────────────────────
+    msgInput.addEventListener('input', () => {
+        const len = msgInput.value.length;
+        charCountEl.textContent = len > 0 ? len.toLocaleString('fr') : '';
+        charCountEl.className   = 'char-counter'
+            + (len > MAX_INPUT_LEN * 0.95 ? ' danger'
+             : len > MAX_INPUT_LEN * 0.75 ? ' warn' : '');
+    });
+
+    // ── Ctrl+Entrée ───────────────────────────────────────────────────────────
+    msgInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            document.getElementById('chat-form').requestSubmit();
+        }
+    });
+
+    // ── Helpers DOM ───────────────────────────────────────────────────────────
+    function escapeHtml(s) {
+        // Substitution pure — évite la création d'un élément DOM à chaque appel
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function appendMsg(role, text) {
+        const emptyState = chatHistory.querySelector('.empty-state');
+        if (emptyState) emptyState.remove();
+
+        if (chatHistory.querySelectorAll('.msg').length > 0) {
+            const d = document.createElement('div');
+            d.className = 'divider';
+            chatHistory.appendChild(d);
+        }
+        const div = document.createElement('div');
+        div.className = `msg ${role === 'user' ? 'user' : 'bot bot-msg'}`;
+        div.innerHTML = `<div class="msg-role">${role === 'user' ? 'Vous' : 'Bot'}</div>`
+                      + `<div class="msg-text">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`
+                      + (role !== 'user' ? `<button class="btn-copy" onclick="copyMsg(this)" title="Copier">⎘ copier</button>` : '');
+        chatHistory.appendChild(div);
+        div.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        return div;
+    }
+
+    // ── Copier un message ─────────────────────────────────────────────────────
+    function copyMsg(btn) {
+        const text = btn.previousElementSibling.innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            btn.textContent = '✓ copié';
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.textContent = '⎘ copier';
+                btn.classList.remove('copied');
+            }, 1500);
+        });
+    }
+
+    // ── Bouton Régénérer ──────────────────────────────────────────────────────
+    function showRegenBtn(botDiv) {
+        // Retire le bouton précédent s'il existe
+        document.querySelectorAll('.btn-regen').forEach(b => b.remove());
+        const btn = document.createElement('button');
+        btn.className   = 'btn-regen';
+        btn.textContent = '↺ régénérer';
+        btn.title       = 'Relancer la génération de cette réponse';
+        btn.onclick     = () => {
+            // Retirer les 2 derniers messages du DOM (user + bot) et leurs dividers
+            const msgs = Array.from(chatHistory.querySelectorAll('.msg'));
+            const last2 = msgs.slice(-2);
+            last2.forEach(m => {
+                const prev = m.previousElementSibling;
+                if (prev?.classList.contains('divider')) prev.remove();
+                m.remove();
+            });
+            document.getElementById('regen-input').value = 'true';
+            sendStreaming(lastUserText);
+        };
+        botDiv.appendChild(btn);
+    }
+
+    // ── Mise à jour statusbar dynamique ───────────────────────────────────────
+    function updateTokenStatsDOM(data) {
+        const el         = document.getElementById('stat-tokens');
+        if (!el) return;
+        const approxMark = data.ctx_approx ? '~' : '';
+        const title      = data.ctx_approx
+            ? "Valeur approximative — ajoutez « PARAMETER num_ctx N » dans votre Modelfile pour plus de précision"
+            : "Tokens utilisés dans la fenêtre de contexte";
+        el.className     = `stat token-stat ${data.level || 'ok'}`;
+        el.title         = title;
+        el.innerHTML     = `tokens <span>${data.prompt_tokens} / ${approxMark}${data.ctx_size}</span>`
+                         + ` <span>(${data.pct}%)</span>`;
+        el.style.display = '';
+    }
+
+    function updateMsgCountDOM() {
+        const el = document.querySelector('#stat-msgs span');
+        if (el) el.textContent = chatHistory.querySelectorAll('.msg').length;
+    }
+
+    function showExportBtn() {
+        const el = document.getElementById('btn-export');
+        if (el) el.style.display = '';
+    }
+
+    // ── Label de configuration dans la topbar ─────────────────────────────────
+    function updateConfigLabel() {
+        const model     = document.getElementById('model-select')?.value || defaultModel;
+        const psel      = document.getElementById('prompt-select');
+        const prompt    = psel?.value === '__custom__' ? 'Personnalisé'
+                        : (psel?.value || currentPrompt).replace(/\.txt$/, '');
+        const voice     = document.getElementById('voice-select')?.value || '';
+        const voiceName = voice.replace(/^[a-z]{2}_[A-Z]{2}-/, '').replace(/\.onnx$/, '');
+        const parts     = [prompt, model, voiceName].filter(Boolean);
+        document.getElementById('config-label').innerHTML =
+            parts.map(p => `<span>${p}</span>`).join('');
+    }
+
+    // ── Sélecteur de prompt ───────────────────────────────────────────────────
+    (async function initPromptSelect() {
+        const sel        = document.getElementById('prompt-select');
+        const customText = document.getElementById('custom-prompt-text');
+        const applyBtn   = document.getElementById('btn-apply-prompt');
+        const hint       = document.getElementById('prompt-hint');
+
+        try {
+            const { prompts } = await fetch('/prompts').then(r => r.json());
+            const customOpt   = document.createElement('option');
+            customOpt.value   = '__custom__';
+            customOpt.text    = '— Prompt personnalisé —';
+            customOpt.selected = (currentPrompt === '__custom__');
+            sel.appendChild(customOpt);
+            prompts.forEach(f => {
+                const opt    = document.createElement('option');
+                opt.value    = f;
+                opt.text     = f.replace(/\.txt$/, '');
+                opt.selected = (f === currentPrompt);
+                sel.appendChild(opt);
+            });
+            if (currentPrompt === '__custom__') {
+                customText.style.display = '';
+                applyBtn.style.display   = '';
+            }
+        } catch {
+            const opt = document.createElement('option');
+            opt.value = 'system_prompt.txt'; opt.text = 'system_prompt';
+            sel.appendChild(opt);
+        }
+
+        sel.onchange = async () => {
+            const val      = sel.value;
+            const isCustom = val === '__custom__';
+            customText.style.display = isCustom ? '' : 'none';
+            applyBtn.style.display   = isCustom ? '' : 'none';
+            if (!isCustom) {
+                await fetch('/session/prompt', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ file: val }),
+                });
+                hint.textContent = `Prompt « ${val.replace(/\.txt$/, '')} » actif.`;
+            } else {
+                hint.textContent = '';
+            }
+            updateConfigLabel();
+        };
+
+        applyBtn.onclick = async () => {
+            const text = customText.value.trim();
+            if (!text) return;
+            await fetch('/session/prompt', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ text }),
+            });
+            hint.textContent = `Prompt personnalisé actif (${text.length} caractères).`;
+            updateConfigLabel();
+        };
+    })();
+
+    // ── Sélecteur de modèle ───────────────────────────────────────────────────
+    (async function initModelSelect() {
+        const sel = document.getElementById('model-select');
+        try {
+            const { models, default: def } = await fetch('/models').then(r => r.json());
+            const saved = localStorage.getItem('ollama-model') || def;
+            const list  = models.length ? models : [def];
+            list.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m; opt.text = m; opt.selected = (m === saved);
+                sel.appendChild(opt);
+            });
+            modelInput.value = sel.value;
+        } catch {
+            const opt = document.createElement('option');
+            opt.value = modelInput.value; opt.text = modelInput.value; opt.selected = true;
+            sel.appendChild(opt);
+        }
+        sel.onchange = () => {
+            modelInput.value = sel.value;
+            localStorage.setItem('ollama-model', sel.value);
+            updateConfigLabel();
+        };
+        updateConfigLabel();
+    })();
+
+    // ── Température ───────────────────────────────────────────────────────────
+    (function initTemperature() {
+        const slider   = document.getElementById('temp-slider');
+        const valLabel = document.getElementById('temp-val');
+        const input    = document.getElementById('temp-input');
+        const saved    = parseFloat(localStorage.getItem('ollama-temp') || '0.7');
+        slider.value   = saved;
+        valLabel.textContent = saved.toFixed(1);
+        input.value    = saved;
+        slider.oninput = () => {
+            const v = parseFloat(slider.value).toFixed(1);
+            valLabel.textContent = v;
+            input.value          = v;
+            localStorage.setItem('ollama-temp', v);
+        };
+    })();
+
+    // ── Sélecteur de voix ─────────────────────────────────────────────────────
+    (async function initVoiceSelect() {
+        const sel  = document.getElementById('voice-select');
+        const card = document.getElementById('voice-card');
+        const hint = document.getElementById('voice-hint');
+        try {
+            const { voices, default: def } = await fetch('/voices').then(r => r.json());
+            if (!voices.length) {
+                card.style.opacity = '0.4';
+                hint.textContent   = 'Aucune voix Piper disponible. Déposez un .onnx dans voices/.';
+                return;
+            }
+            const saved = localStorage.getItem('tts-voice') || def;
+            voices.forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v;
+                opt.text  = v.replace(/^[a-z]{2}_[A-Z]{2}-/, '').replace(/\.onnx$/, '');
+                opt.selected = (v === saved);
+                sel.appendChild(opt);
+                // Indexer par langue (2 premières lettres du nom : fr_FR-..., en_US-...)
+                const lang = v.slice(0, 2);
+                (voicesByLang[lang] = voicesByLang[lang] || []).push(v);
+            });
+            sel.onchange = () => { localStorage.setItem('tts-voice', sel.value); updateConfigLabel(); };
+            updateConfigLabel();
+        } catch {
+            card.style.opacity = '0.4';
+            hint.textContent   = 'Piper non disponible.';
+            return;
+        }
+
+        // Voix chargée — déclencher l'autoplay si en attente
+        if (autoplayPending && ttsEnabled) {
+            autoplayPending = false;
+            readLastBotMessage();
+        }
+    })();
+
+    // ── TTS toggle ────────────────────────────────────────────────────────────
+    function updateTtsBtn(pending = false) {
+        ttsBtn.classList.remove('enabled', 'pending');
+        if (pending) {
+            ttsBtn.classList.add('pending');
+            ttsBtn.textContent = '▶ Lire';
+            ttsBtn.title       = 'Cliquer pour lire la réponse (autoplay bloqué par le navigateur)';
+        } else {
+            ttsBtn.classList.toggle('enabled', ttsEnabled);
+            ttsBtn.textContent = ttsEnabled ? '🔊' : '🔇';
+            ttsBtn.title       = ttsEnabled ? 'Audio activé — cliquer pour désactiver'
+                                            : 'Audio désactivé — cliquer pour activer';
+        }
+    }
+    updateTtsBtn();
+
+    ttsBtn.onclick = () => {
+        if (ttsBtn.classList.contains('pending')) {
+            updateTtsBtn();
+            readLastBotMessage();
+            return;
+        }
+        ttsEnabled = !ttsEnabled;
+        localStorage.setItem('tts-enabled', ttsEnabled);
+        if (!ttsEnabled) {
+            ttsQueue.length = 0;
+            streamTtsBuf    = '';
+            if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+            ttsPlaying = false;
+            ttsBtn.classList.remove('playing');
+        }
+        updateTtsBtn();
+    };
+
+    // ── Détection de langue et sélection de voix ─────────────────────────────
+    function detectLang(text) {
+        const s   = text.toLowerCase().slice(0, 500);
+        const fr  = (s.match(/\b(le|la|les|un|une|des|est|sont|et|ou|que|je|tu|vous|nous|ils|elles|de|du|au|aux|en|ce|se|sa|son|sur|pas|plus|très|bien|avec|pour|dans|qui|par|mais)\b/g) || []).length;
+        const en  = (s.match(/\b(the|is|are|it|this|that|of|and|to|in|a|an|you|we|they|have|has|be|for|on|with|as|not|but|at|or|from|by|do|was|were|been|will|can|would|should|which)\b/g) || []).length;
+        if (fr === 0 && en === 0) return currentTtsLang;  // pas assez de texte
+        return en > fr ? 'en' : 'fr';
+    }
+
+    function getVoiceForLang(lang) {
+        const candidates = voicesByLang[lang] || [];
+        if (candidates.length) {
+            const saved = localStorage.getItem(`tts-voice-${lang}`);
+            return (saved && candidates.includes(saved)) ? saved : candidates[0];
+        }
+        return document.getElementById('voice-select').value;  // fallback: voix sélectionnée
+    }
+
+    // ── TTS lecture bas niveau ────────────────────────────────────────────────
+    const TTS_SEGMENT_MAX = 550;
+
+    function splitIntoSegments(text, maxLen) {
+        const segments = [];
+        let remaining  = text.trim();
+        while (remaining.length > maxLen) {
+            const chunk = remaining.slice(0, maxLen);
+            const match = chunk.match(/^(.*[.!?])\s+\S/s);
+            let cutAt;
+            if (match) {
+                cutAt = match[1].length;
+            } else {
+                const lastSpace = chunk.lastIndexOf(' ');
+                cutAt = lastSpace > 0 ? lastSpace : maxLen;
+            }
+            segments.push(remaining.slice(0, cutAt).trim());
+            remaining = remaining.slice(cutAt).trim();
+        }
+        if (remaining) segments.push(remaining);
+        return segments.filter(s => s.length > 0);
+    }
+
+    async function playSegments(segments, voice) {
+        const v = voice || document.getElementById('voice-select').value;
+        if (!v) return;
+        for (let i = 0; i < segments.length; i++) {
+            if (!ttsEnabled) break;
+            ttsBtn.classList.add('playing');
+            ttsBtn.textContent = segments.length > 1 ? `🔊 ${i+1}/${segments.length}` : '🔊…';
+            await new Promise((resolve, reject) => {
+                const url   = '/tts?text=' + encodeURIComponent(segments[i])
+                            + '&voice='    + encodeURIComponent(v);
+                const audio = new Audio(url);
+                currentAudio = audio;
+                audio.onended = resolve;
+                audio.onerror = reject;
+                audio.play().catch(err => {
+                    if (err.name === 'NotAllowedError') updateTtsBtn(true);
+                    reject(err);
+                });
+            });
+        }
+    }
+
+    // ── File d'attente TTS (streaming) ────────────────────────────────────────
+    function stripMarkdownLight(text) {
+        return text
+            .replace(/\*{1,2}(.+?)\*{1,2}/gs, '$1')
+            .replace(/_{1,2}(.+?)_{1,2}/gs, '$1')
+            .replace(/`+(.+?)`+/gs, '$1')
+            .replace(/^#{1,6}\s+/gm, '')
+            .trim();
+    }
+
+    function enqueueTTS(text) {
+        const clean = stripMarkdownLight(text.trim());
+        if (!clean || !ttsEnabled) return;
+        ttsQueue.push({ text: clean, lang: currentTtsLang });
+        if (!ttsPlaying) drainTTSQueue();
+    }
+
+    async function drainTTSQueue() {
+        ttsPlaying = true;
+        while (ttsQueue.length > 0 && ttsEnabled) {
+            const item     = ttsQueue.shift();
+            const voice    = getVoiceForLang(item.lang);
+            const segments = splitIntoSegments(item.text, TTS_SEGMENT_MAX);
+            try {
+                await playSegments(segments, voice);
+            } catch(e) {
+                if (e?.name === 'NotAllowedError') { break; }
+                if (e?.name !== 'AbortError') console.error('TTS erreur:', e);
+            }
+        }
+        ttsPlaying = false;
+        ttsBtn.classList.remove('playing');
+        if (!ttsBtn.classList.contains('pending')) updateTtsBtn();
+    }
+
+    // Détecte les fins de phrase dans le buffer de streaming et enqueue
+    function flushTtsBuf(flush = false) {
+        while (true) {
+            const m = streamTtsBuf.match(/^(.*?[.!?…])\s/s);
+            if (m) {
+                enqueueTTS(m[1]);
+                streamTtsBuf = streamTtsBuf.slice(m[1].length).trimStart();
+            } else if (flush && streamTtsBuf.trim()) {
+                enqueueTTS(streamTtsBuf.trim());
+                streamTtsBuf = '';
+                break;
+            } else {
+                break;
+            }
+        }
+    }
+
+    // ── Lecture du dernier message bot (autoplay page reload) ─────────────────
+    function readLastBotMessage() {
+        if (!ttsEnabled) return;
+        const blocks = chatHistory.querySelectorAll('.bot-msg .msg-text');
+        if (!blocks.length) return;
+        const text = blocks[blocks.length - 1].innerText.trim();
+        if (!text) return;
+        currentTtsLang = detectLang(text);
+        const sentences = text.match(/[^.!?…]+[.!?…]+[\s]*/g) || [text];
+        sentences.forEach(s => enqueueTTS(s.trim()));
+    }
+
+    // ── Streaming ─────────────────────────────────────────────────────────────
+    const stopBtn = document.getElementById('stop-btn');
+    stopBtn.onclick = () => streamAbort?.abort();
+
+    function setStreamingUI(active) {
+        sendBtn.style.display = active ? 'none' : '';
+        stopBtn.style.display = active ? ''     : 'none';
+    }
+
+    async function sendStreaming(text, regenerate = false) {
+        text = (text ?? msgInput.value).trim();
+        if (!text || stopBtn.style.display !== 'none') return;
+
+        if (!regenerate) {
+            lastUserText            = text;
+            msgInput.value          = '';
+            charCountEl.textContent = '';
+            document.getElementById('regen-input').value = 'false';
+        }
+
+        setStreamingUI(true);
+
+        // Basculer en vue chat
+        chatHistory.classList.remove('hidden');
+        if (settingsOpen) setSettings(false);
+
+        // Supprimer le bouton régénérer précédent
+        document.querySelectorAll('.btn-regen').forEach(b => b.remove());
+
+        // Ajouter les bulles dans le DOM
+        if (!regenerate) appendMsg('user', text);
+        const botDiv    = appendMsg('bot', '');
+        const botTextEl = botDiv.querySelector('.msg-text');
+
+        streamTtsBuf = '';
+        let botAccum     = '';
+        let scrollQueued = false;
+
+        streamAbort = new AbortController();
+
+        const fd = new FormData();
+        fd.append('user_input',  text);
+        fd.append('model',       modelInput.value);
+        fd.append('temperature', document.getElementById('temp-input').value);
+        fd.append('regenerate',  regenerate ? 'true' : 'false');
+
+        try {
+            const resp = await fetch('/stream', {
+                method: 'POST', body: fd, signal: streamAbort.signal
+            });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+            const reader  = resp.body.getReader();
+            const dec     = new TextDecoder();
+            let   lineBuf = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                lineBuf += dec.decode(value, { stream: true });
+                const parts = lineBuf.split('\n');
+                lineBuf = parts.pop();
+
+                for (const line of parts) {
+                    if (!line.startsWith('data: ')) continue;
+                    let data;
+                    try { data = JSON.parse(line.slice(6)); } catch { continue; }
+
+                    if (data.token) {
+                        botAccum += data.token;
+                        botTextEl.textContent += data.token;
+                        if (!scrollQueued) {
+                            scrollQueued = true;
+                            requestAnimationFrame(() => {
+                                botDiv.scrollIntoView({ block: 'end', behavior: 'instant' });
+                                scrollQueued = false;
+                            });
+                        }
+                        if (botAccum.length >= 100 && botAccum.length - data.token.length < 100) {
+                            currentTtsLang = detectLang(botAccum);
+                        }
+                        streamTtsBuf += data.token;
+                        flushTtsBuf();
+                    }
+                    if (data.done) {
+                        botTextEl.innerHTML = escapeHtml(botAccum).replace(/\n/g, '<br>');
+                        flushTtsBuf(true);
+                        updateTokenStatsDOM(data);
+                        showExportBtn();
+                        updateMsgCountDOM();
+                        showRegenBtn(botDiv);
+                        // Notification si l'onglet est en arrière-plan
+                        if (document.hidden && Notification.permission === 'granted') {
+                            new Notification('MyThott', { body: botAccum.slice(0, 80) });
+                        }
+                    }
+                    if (data.error) {
+                        botTextEl.innerHTML = `<span style="color:#c05050">${escapeHtml(data.error)}</span>`;
+                    }
+                }
+            }
+        } catch(e) {
+            if (e.name !== 'AbortError') {
+                botTextEl.innerHTML = `<span style="color:#c05050">${escapeHtml('[Erreur : ' + e.message + ']')}</span>`;
+            }
+            // Si stop manuel : garder le texte déjà affiché
+        } finally {
+            streamAbort = null;
+            setStreamingUI(false);
+        }
+    }
+
+    // ── STT (faster-whisper) ──────────────────────────────────────────────────
+    const micBtn = document.getElementById('mic-btn');
+
+    // Afficher le bouton micro uniquement si MediaRecorder est supporté
+    if (window.MediaRecorder && navigator.mediaDevices?.getUserMedia) {
+        micBtn.style.display = '';
+    }
+
+    micBtn.addEventListener('click', () => {
+        isRecording ? stopRecording() : startRecording();
+    });
+
+    async function startRecording() {
+        try {
+            const stream  = await navigator.mediaDevices.getUserMedia({ audio: true });
+            // Préférer webm/opus, sinon laisser le navigateur choisir
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                ? 'audio/webm;codecs=opus' : '';
+            mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+            audioChunks   = [];
+            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+            mediaRecorder.onstop = handleRecordingStop;
+            mediaRecorder.start();
+            isRecording          = true;
+            micBtn.classList.add('recording');
+            micBtn.title         = 'Arrêter l\'enregistrement';
+
+            // Compte à rebours affiché sur le bouton
+            let remaining = STT_MAX_SECONDS;
+            micBtn.textContent = `⏹ ${remaining}s`;
+            recTickId = setInterval(() => {
+                remaining--;
+                micBtn.textContent = `⏹ ${remaining}s`;
+            }, 1000);
+
+            // Auto-stop à la limite
+            recTimerId = setTimeout(() => stopRecording(), STT_MAX_SECONDS * 1000);
+        } catch(e) {
+            console.error('Micro non accessible :', e);
+            micBtn.title = 'Microphone non accessible : ' + e.message;
+        }
+    }
+
+    function stopRecording() {
+        clearTimeout(recTimerId);
+        clearInterval(recTickId);
+        recTimerId = recTickId = null;
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            mediaRecorder.stream.getTracks().forEach(t => t.stop());
+        }
+        isRecording = false;
+        micBtn.classList.remove('recording');
+        micBtn.classList.add('processing');
+        micBtn.textContent = '…';
+        micBtn.title       = 'Transcription en cours…';
+    }
+
+    async function handleRecordingStop() {
+        if (!audioChunks.length) {
+            micBtn.classList.remove('processing');
+            micBtn.textContent = '🎤';
+            micBtn.title       = 'Parler';
+            return;
+        }
+        const mimeType = mediaRecorder?.mimeType || 'audio/webm';
+        const ext      = mimeType.includes('ogg') ? '.ogg' : '.webm';
+        const blob     = new Blob(audioChunks, { type: mimeType });
+        const fd       = new FormData();
+        fd.append('audio', blob, 'recording' + ext);
+        try {
+            const resp = await fetch('/stt', { method: 'POST', body: fd });
+            const data = await resp.json();
+            if (data.text) {
+                const sep      = msgInput.value && !msgInput.value.endsWith(' ') ? ' ' : '';
+                msgInput.value += sep + data.text;
+                msgInput.dispatchEvent(new Event('input'));
+                msgInput.focus();
+            } else if (data.error) {
+                console.error('STT erreur :', data.error);
+            }
+        } catch(e) {
+            console.error('STT réseau :', e);
+        } finally {
+            micBtn.classList.remove('processing');
+            micBtn.textContent = '🎤';
+            micBtn.title       = 'Parler';
+        }
+    }
+
+    // ── Soumission du formulaire → streaming ──────────────────────────────────
+    document.getElementById('chat-form').addEventListener('submit', e => {
+        e.preventDefault();
+        // Demander la permission notification au premier envoi (geste utilisateur requis)
+        if (Notification.permission === 'default') Notification.requestPermission();
+        sendStreaming();
+    });
+
+    // ── Autoplay au chargement (historique rendu par le serveur) ──────────────
+    const autoTarget = chatHistory.querySelector('.bot-msg[data-tts-auto="1"]');
+    if (autoTarget && ttsEnabled) {
+        const voiceReady = document.getElementById('voice-select').options.length > 0;
+        if (voiceReady) {
+            readLastBotMessage();
+        } else {
+            autoplayPending = true;  // initVoiceSelect le déclenchera
+        }
+    }
+</script>
+</body>
+</html>

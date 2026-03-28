@@ -2,7 +2,7 @@
 """
 Chatbot UI
 ==========
-Version: 2.4.0
+Version: 2.5.0
 Licence: MIT
 
 Interface web générique pour chatbots propulsés par Ollama.
@@ -10,11 +10,14 @@ Les prompts sont des fichiers .txt dans prompts/ (interchangeables via l'UI).
 
 Fonctionnalités :
   - Réponses en streaming token par token (SSE)
+  - Arrêt du streaming (bouton Stop + AbortController côté client)
+  - Régénération de la dernière réponse
   - TTS via Piper (optionnel) avec détection de langue automatique
   - STT via faster-whisper (optionnel, chargé à la demande)
-  - Sélecteur de modèle, de prompt et de voix dans l'UI
+  - Sélecteur de modèle, de prompt, de voix et de température dans l'UI
   - Compteur de tokens avec détection du contexte Ollama
   - Export de la conversation en .txt
+  - Notification navigateur quand la réponse est prête (onglet en arrière-plan)
 
 LANCEMENT
 ---------

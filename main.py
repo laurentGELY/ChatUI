@@ -92,6 +92,11 @@ http_client: Optional[httpx.AsyncClient] = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Manage the application lifespan and shared HTTP client.
+
+    Creates a shared ``httpx.AsyncClient`` on startup and closes it cleanly
+    on shutdown, ensuring connection pools are released.
+    """
     global http_client
     http_client = httpx.AsyncClient(timeout=120.0)
     yield
@@ -114,7 +119,19 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def strip_markdown(text: str) -> str:
-    """Supprime les marqueurs Markdown générés par les LLM (pour le TTS et l'affichage)."""
+    """Remove Markdown formatting markers from text.
+
+    Strips headings, bold/italic, inline code, horizontal rules, and
+    bullet points. Used to clean LLM output before TTS synthesis and
+    plain-text display.
+
+    Args:
+        text: Input text potentially containing Markdown markers.
+
+    Returns:
+        Plain text with all Markdown markers removed and consecutive
+        blank lines collapsed to at most one.
+    """
     text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
     text = re.sub(r'\*{2}(.+?)\*{2}', r'\1', text, flags=re.DOTALL)
     text = re.sub(r'_{2}(.+?)_{2}',   r'\1', text, flags=re.DOTALL)
@@ -128,6 +145,20 @@ def strip_markdown(text: str) -> str:
 
 
 def get_session_prompt(session_id: str) -> str:
+    """Return the active system prompt text for a session.
+
+    Resolves the prompt from ``PROMPT_STATES``:
+    - ``"__custom__"`` → returns the inline text from ``CUSTOM_PROMPTS``.
+    - A filename → reads and returns that file from ``PROMPTS_DIR``.
+    - Not set → falls back to ``DEFAULT_PROMPT_FILE``.
+
+    Args:
+        session_id: The session identifier.
+
+    Returns:
+        The system prompt text. Returns a descriptive error string if the
+        file is missing or the resolved path is outside ``PROMPTS_DIR``.
+    """
     state = PROMPT_STATES.get(session_id)
     if state == "__custom__":
         return CUSTOM_PROMPTS.get(session_id, "[ERREUR : prompt personnalisé non défini]")
@@ -144,6 +175,14 @@ def get_session_prompt(session_id: str) -> str:
 
 
 def get_or_create_session_id(request: Request) -> str:
+    """Return the session ID from the request cookie, or generate a new one.
+
+    Args:
+        request: The incoming HTTP request.
+
+    Returns:
+        A UUID session ID string (existing from cookie, or freshly generated).
+    """
     session_id = request.cookies.get("session_id")
     if not session_id:
         session_id = str(uuid.uuid4())
@@ -152,15 +191,22 @@ def get_or_create_session_id(request: Request) -> str:
 
 
 async def get_model_ctx(model: str) -> tuple[int, bool]:
-    """
-    Retourne (num_ctx, is_approx) pour le modèle.
+    """Retrieve the effective context window size for an Ollama model.
 
-    Priorité :
-      1. num_ctx explicite dans les paramètres Modelfile  → valeur exacte  (approx=False)
-      2. Contexte natif du modèle (model_info)            → probablement surestimé (approx=True)
-      3. Défaut Ollama historique (2048)                  → fallback sûr   (approx=True)
+    Queries ``/api/show`` and resolves the context size using this priority:
 
-    Note : la valeur native peut dépasser ce qu'Ollama charge réellement selon la RAM/VRAM.
+    1. Explicit ``num_ctx`` in Modelfile parameters → exact value (``is_approx=False``).
+    2. Native context length from ``model_info``    → approximate (may be inflated by VRAM).
+    3. Ollama historical default of 2048            → safe fallback.
+
+    Results are cached in ``MODEL_CTX_CACHE`` to avoid repeated API calls.
+
+    Args:
+        model: Ollama model identifier (e.g. ``"llama3.1:8b-instruct-q4_K_M"``).
+
+    Returns:
+        A ``(num_ctx, is_approx)`` tuple. ``is_approx`` is ``True`` when the
+        value is an estimate rather than the explicitly configured context size.
     """
     if model in MODEL_CTX_CACHE:
         return MODEL_CTX_CACHE[model]
@@ -199,8 +245,22 @@ async def get_model_ctx(model: str) -> tuple[int, bool]:
 
 
 def build_messages(history: List[Dict[str, str]], user_input: str, session_id: str) -> List[Dict[str, str]]:
-    """Construit la liste de messages pour Ollama. Tout l'historique est inclus —
-    le compteur de tokens dans l'UI avertit l'utilisateur si la fenêtre approche."""
+    """Build the message list for an Ollama API call.
+
+    Prepends the session system prompt, appends the full conversation
+    history, and adds the new user message at the end. The full history
+    is always included; the token counter in the UI warns when the
+    context window is nearly full.
+
+    Args:
+        history: Previous conversation turns as ``{"role": ..., "content": ...}`` dicts.
+        user_input: The new user message text.
+        session_id: Session identifier used to look up the active system prompt.
+
+    Returns:
+        A list of message dicts (system + history + new user message) ready
+        for the Ollama ``/api/chat`` endpoint.
+    """
     messages = [{"role": "system", "content": get_session_prompt(session_id)}]
     messages.extend(history)
     messages.append({"role": "user", "content": user_input})
@@ -208,7 +268,17 @@ def build_messages(history: List[Dict[str, str]], user_input: str, session_id: s
 
 
 async def call_ollama(messages: List[Dict[str, str]], model: str, temperature: float = 0.7) -> tuple[str, int]:
-    """Appelle Ollama et retourne (réponse, prompt_eval_count)."""
+    """Call the Ollama /api/chat endpoint and return the full reply (non-streaming).
+
+    Args:
+        messages: Conversation messages including the system prompt.
+        model: Ollama model identifier.
+        temperature: Sampling temperature (0.0 = deterministic, 1.0 = creative).
+
+    Returns:
+        A ``(reply_text, prompt_eval_count)`` tuple. On connection or API
+        errors, returns a descriptive error string and ``0`` for token count.
+    """
     try:
         resp = await http_client.post(
             f"{OLLAMA_URL}/api/chat",
@@ -228,7 +298,17 @@ async def call_ollama(messages: List[Dict[str, str]], model: str, temperature: f
 # ── STT (faster-whisper) ───────────────────────────────────────────────────────
 
 def get_stt_model():
-    """Charge le modèle Whisper à la première utilisation (lazy init, thread-safe)."""
+    """Return the faster-whisper model, loading it on first call (lazy, thread-safe).
+
+    Uses double-checked locking via ``_STT_LOAD_LOCK`` to ensure the model
+    is loaded only once even under concurrent requests.
+
+    Returns:
+        A ``WhisperModel`` instance (``small``, CPU, int8).
+
+    Raises:
+        RuntimeError: If ``faster-whisper`` is not installed.
+    """
     global STT_MODEL
     if STT_MODEL is not None:
         return STT_MODEL
@@ -245,7 +325,19 @@ def get_stt_model():
 
 @app.post("/stt")
 async def speech_to_text(audio: UploadFile = File(...)):
-    """Transcrit un fichier audio (webm/wav/ogg) en texte via faster-whisper."""
+    """Transcribe an uploaded audio file to text using faster-whisper.
+
+    Accepts webm, wav, or ogg audio. Files larger than ``STT_MAX_AUDIO_MB``
+    are rejected. Transcription runs in a thread pool to avoid blocking the
+    event loop.
+
+    Args:
+        audio: Uploaded audio file.
+
+    Returns:
+        JSON ``{"text": ..., "language": ...}`` on success, or
+        ``{"error": ...}`` with an appropriate HTTP status on failure.
+    """
     tmp_path = None
     try:
         content = await audio.read()
@@ -280,12 +372,30 @@ async def speech_to_text(audio: UploadFile = File(...)):
 
 @app.get("/voices")
 def list_voices():
+    """List available Piper TTS voice model files.
+
+    Returns:
+        JSON with ``voices`` (sorted list of ``.onnx`` filenames) and ``default``.
+    """
     models = sorted(p.name for p in VOICES_DIR.glob("*.onnx"))
     return {"voices": models, "default": DEFAULT_VOICE}
 
 
 @app.get("/tts")
 async def tts_piper(text: str, voice: str = DEFAULT_VOICE):
+    """Synthesize speech from text using the Piper TTS binary.
+
+    Runs Piper in a thread pool to avoid blocking the event loop. Voice path
+    is validated to stay within ``VOICES_DIR`` (path-traversal guard).
+
+    Args:
+        text: Text to synthesize.
+        voice: Filename of the ``.onnx`` voice model in the voices directory.
+
+    Returns:
+        A WAV audio stream on success, or an HTML error response if Piper
+        is missing, the voice file is invalid, or synthesis fails.
+    """
     model_path = (VOICES_DIR / voice).resolve()
     if model_path.parent != VOICES_DIR.resolve() or model_path.suffix != ".onnx":
         return HTMLResponse("Voix invalide", status_code=400)
@@ -323,6 +433,12 @@ async def tts_piper(text: str, voice: str = DEFAULT_VOICE):
 
 @app.get("/models")
 async def list_models():
+    """List Ollama models available on the local server.
+
+    Returns:
+        JSON with ``models`` (sorted list of model name strings) and ``default``.
+        Returns an empty ``models`` list if Ollama is unreachable.
+    """
     try:
         resp = await http_client.get(f"{OLLAMA_URL}/api/tags", timeout=5.0)
         resp.raise_for_status()
@@ -335,12 +451,30 @@ async def list_models():
 
 @app.get("/prompts")
 def list_prompts():
+    """List system prompt files available in the prompts directory.
+
+    Returns:
+        JSON with ``prompts`` (sorted list of ``.txt`` filenames) and ``default``.
+    """
     files = sorted(p.name for p in PROMPTS_DIR.glob("*.txt"))
     return {"prompts": files, "default": DEFAULT_PROMPT_FILE}
 
 
 @app.post("/session/prompt")
 async def set_session_prompt(request: Request):
+    """Set the active system prompt for the current session.
+
+    Accepts a JSON body with either:
+    - ``{"file": "<filename.txt>"}`` — selects a file from ``prompts/``.
+    - ``{"text": "<prompt text>"}`` — sets an inline custom prompt.
+
+    Args:
+        request: HTTP request with JSON body.
+
+    Returns:
+        JSON ``{"ok": true, "file": filename}`` on success, or
+        ``{"ok": false, "error": ...}`` with an appropriate HTTP status.
+    """
     session_id = get_or_create_session_id(request)
     try:
         data = await request.json()
@@ -369,6 +503,17 @@ async def set_session_prompt(request: Request):
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
+    """Render the main chat UI page.
+
+    Sets a ``session_id`` cookie on first visit. Passes conversation history
+    and token statistics (prompt tokens vs. context window) to the template.
+
+    Args:
+        request: The incoming HTTP request (session cookie read here).
+
+    Returns:
+        HTML response rendered from ``templates/index.html``.
+    """
     session_id     = get_or_create_session_id(request)
     history        = CONVERSATIONS.get(session_id, [])
     current_prompt = PROMPT_STATES.get(session_id, DEFAULT_PROMPT_FILE)
@@ -410,6 +555,21 @@ async def send_message(
     model: str        = Form(OLLAMA_DEFAULT_MODEL),
     temperature: float = Form(0.7),
 ):
+    """Send a message and wait for the complete Ollama reply (blocking).
+
+    Calls Ollama synchronously, appends the exchange to session history,
+    updates token stats, and redirects to ``/``. Prefer ``/stream`` for
+    interactive use to avoid request timeouts on long replies.
+
+    Args:
+        request: HTTP request (session cookie).
+        user_input: The user's message text (truncated to ``MAX_USER_INPUT_LEN``).
+        model: Ollama model identifier.
+        temperature: Sampling temperature.
+
+    Returns:
+        A 303 redirect to ``/``.
+    """
     if len(user_input) > MAX_USER_INPUT_LEN:
         user_input = user_input[:MAX_USER_INPUT_LEN]
 
@@ -439,7 +599,16 @@ async def send_message(
 
 @app.get("/export")
 async def export_conversation(request: Request):
-    """Télécharge la conversation courante en fichier texte."""
+    """Download the current session's conversation as a plain-text file.
+
+    Args:
+        request: HTTP request (session cookie).
+
+    Returns:
+        A plain-text file attachment named
+        ``conversation_YYYYMMDD_HHMM.txt``, or a 404 response if the
+        session has no conversation history.
+    """
     session_id = get_or_create_session_id(request)
     history    = CONVERSATIONS.get(session_id, [])
     if not history:
@@ -466,8 +635,26 @@ async def stream_message_sse(
     temperature: float = Form(0.7),
     regenerate: bool   = Form(False),
 ):
-    """Envoie un message et retourne la réponse Ollama token par token (Server-Sent Events).
-    Si regenerate=True, supprime le dernier échange avant de soumettre à nouveau.
+    """Send a message and stream the Ollama reply token by token via SSE.
+
+    Each SSE event is a JSON object with one of:
+    - ``{"token": "..."}`` — partial reply text.
+    - ``{"done": true, "prompt_tokens": N, "ctx_size": N, ...}`` — final stats.
+    - ``{"error": "..."}`` — error message.
+
+    Streaming stops immediately if the client disconnects (e.g. Stop button).
+    If no complete response is received, the pending user message is rolled back.
+
+    Args:
+        request: HTTP request (session cookie, disconnect detection).
+        user_input: The user's message text (truncated to ``MAX_USER_INPUT_LEN``).
+        model: Ollama model identifier.
+        temperature: Sampling temperature.
+        regenerate: If ``True``, remove the last user/assistant exchange before
+            re-submitting (response regeneration).
+
+    Returns:
+        A ``text/event-stream`` streaming response.
     """
     if len(user_input) > MAX_USER_INPUT_LEN:
         user_input = user_input[:MAX_USER_INPUT_LEN]
@@ -547,7 +734,16 @@ async def stream_message_sse(
 
 @app.post("/reset", response_class=RedirectResponse)
 async def reset_conversation(request: Request):
-    """Remet la conversation à zéro (garde les paramètres expert/modèle/voix)."""
+    """Clear the current session's conversation history and token stats.
+
+    Model, prompt, voice, and temperature settings are preserved.
+
+    Args:
+        request: HTTP request (session cookie).
+
+    Returns:
+        A 303 redirect to ``/``.
+    """
     session_id = get_or_create_session_id(request)
     CONVERSATIONS.pop(session_id, None)
     SESSION_STATS.pop(session_id, None)
@@ -557,6 +753,12 @@ async def reset_conversation(request: Request):
 
 @app.get("/health")
 async def health_check():
+    """Return server health and configuration status.
+
+    Returns:
+        JSON with app version, Ollama connectivity status, Piper binary
+        availability, available voice model names, and active session count.
+    """
     ollama_ok = False
     try:
         resp = await http_client.get(f"{OLLAMA_URL}/api/tags", timeout=5.0)

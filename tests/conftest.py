@@ -37,7 +37,11 @@ def voices_dir(tmp_path):
 
 @pytest.fixture
 def mock_http():
-    """AsyncMock replacing main.http_client for one test."""
+    """Return an AsyncMock that replaces ``main.http_client`` in tests.
+
+    Injected by the ``client`` fixture so no real Ollama server is needed.
+    Individual tests configure return values on this mock as required.
+    """
     return AsyncMock()
 
 

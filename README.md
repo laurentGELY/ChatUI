@@ -133,6 +133,7 @@ The first STT request downloads the Whisper `small` model (~240 MB) from Hugging
 Subsequent requests reuse the cached model (loaded once per server process).
 
 Audio is captured in the browser via `MediaRecorder`, capped at **30 seconds**.
+Upload size is limited to **25 MB** server-side.
 The transcribed text is inserted into the message input for review before sending.
 
 The server automatically detects the spoken language and returns it alongside the transcript.

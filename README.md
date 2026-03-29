@@ -169,21 +169,43 @@ The default voice is `fr_FR-gilles-low.onnx`.
 
 ---
 
+## Testing
+
+```bash
+# Install dev dependencies
+python3 -m pip install -r requirements-dev.txt
+
+# Run all tests
+python3 -m pytest tests/ -v
+```
+
+54 tests covering: helper functions, all HTTP routes, SSE streaming, STT endpoint.
+No real Ollama or Piper needed — all external calls are mocked.
+
+---
+
 ## Project Structure
 
 ```
 ChatUI/
-├── main.py               # FastAPI application
-├── requirements.txt      # Python dependencies
-├── prompts/              # System prompt files (.txt)
+├── main.py                  # FastAPI application
+├── requirements.txt         # Runtime dependencies
+├── requirements-dev.txt     # Test dependencies (pytest)
+├── pytest.ini               # Pytest configuration
+├── prompts/                 # System prompt files (.txt)
 │   └── system_prompt.txt
 ├── templates/
-│   └── index.html        # Single-page UI (Jinja2)
-├── static/               # CSS, JS, icons
+│   └── index.html           # Single-page UI (Jinja2)
+├── static/                  # CSS, JS, icons
+├── tests/                   # Pytest test suite
+│   ├── conftest.py
+│   ├── test_helpers.py
+│   ├── test_routes.py
+│   └── test_stt.py
 ├── bin/
-│   ├── piper             # Piper TTS binary (not in repo)
-│   └── piper_amd64/      # Piper shared libraries (not in repo)
-└── voices/               # Piper voice models (.onnx, not in repo)
+│   ├── piper                # Piper TTS binary (not in repo)
+│   └── piper_amd64/         # Piper shared libraries (not in repo)
+└── voices/                  # Piper voice models (.onnx, not in repo)
 ```
 
 ---

@@ -1,24 +1,27 @@
 #!/bin/bash
 
 # ============================================================
-# pipeline.sh — local dev pipeline for dnd-dm-app
+# pipeline.sh — lean pipeline
+# Documentation enforced at coding time via CLAUDE.md
 # Usage: ./pipeline.sh "your commit message"
 # ============================================================
 
-set -e  # stop on any error
+set -e
 
-# Activate venv if it exists
+COMMIT_MSG=${1:-"auto: commit and push"}
+
+echo ""
+echo "========================================="
+echo " Pipeline starting..."
+echo "========================================="
+
+# ---------------------------------------------------------
+# Activate venv if present
+# ---------------------------------------------------------
 if [ -f ".venv/bin/activate" ]; then
   echo ">>> Activating virtual environment..."
   source .venv/bin/activate
 fi
-
-COMMIT_MSG=${1:-"auto: update docs and push"}
-
-echo ""
-echo "========================================="
-echo " DnD pipeline starting..."
-echo "========================================="
 
 # ---------------------------------------------------------
 # STEP 1 — Run tests
@@ -31,44 +34,58 @@ echo ""
 echo "✅ All tests passed!"
 
 # ---------------------------------------------------------
-# STEP 2 — Update documentation with Claude Code
+# STEP 2 — Check requirements and structure
 # ---------------------------------------------------------
 echo ""
-echo ">>> Step 2/3 — Updating documentation with Claude Code..."
+echo ">>> Step 2/3 — Checking requirements and structure..."
 
-claude --dangerously-skip-permissions "
-You are a documentation assistant. Do the following tasks on this project:
+# Check if any Python files changed
+CHANGED_PY=$(git diff --name-only --diff-filter=d HEAD -- '*.py' | tr '\n' ' ')
 
-1. DOCSTRINGS: Add or update docstrings on all Python functions and classes 
-   that are missing them or have outdated ones. Follow Google style docstrings.
+if [ -n "$CHANGED_PY" ]; then
+  echo ">>> Changed Python files: $CHANGED_PY"
 
-2. README.md: Update the README.md to reflect the current state of the project.
-   Keep the existing structure but update: feature list, usage instructions, 
-   and any outdated information.
+  # Update requirements.txt from venv if present, skip otherwise
+  if [ -f ".venv/bin/activate" ]; then
+    echo ">>> Updating requirements.txt from venv..."
+    pip freeze | grep -v '^\-e' > requirements.txt
+  else
+    echo "ℹ️  No venv found — skipping requirements.txt update."
+  fi
 
-3. requirements.txt: Regenerate requirements.txt based on all imports found 
-   in the Python files. Only include third-party packages (not stdlib).
+  # Check if project structure changed (files added or deleted)
+  STRUCTURE_CHANGES=$(git diff --name-only --diff-filter=AD HEAD)
+  if [ -n "$STRUCTURE_CHANGES" ]; then
+    echo ">>> Structure changes detected: $STRUCTURE_CHANGES"
+    claude --dangerously-skip-permissions "
+Files were added or deleted in this project: $STRUCTURE_CHANGES
 
-4. CHANGELOG.md: Append a new entry at the top of CHANGELOG.md (create the 
-   file if it does not exist) with today's date and a summary of recent changes 
-   based on recent git commits and current code state.
-
-Keep changes minimal and accurate. Do not invent features that don't exist.
+TASKS (be minimal and token-efficient):
+1. Update README.md only if the structure change affects usage or features.
+2. Append ONE brief entry to CHANGELOG.md with today's date summarizing
+   the structural change. Create the file if it does not exist.
+Do not touch any other files.
 "
+  else
+    echo "ℹ️  No structure changes — skipping README/CHANGELOG update."
+  fi
+
+else
+  echo "ℹ️  No Python files changed — skipping requirements check."
+fi
 
 echo ""
-echo "✅ Documentation updated!"
+echo "✅ Requirements and structure check done!"
 
 # ---------------------------------------------------------
-# STEP 3 — Commit and push to GitLab
+# STEP 3 — Commit and push
 # ---------------------------------------------------------
 echo ""
-echo ">>> Step 3/3 — Committing and pushing to GitLab..."
+echo ">>> Step 3/3 — Committing and pushing..."
 
 git add .
 git status
 
-# Only commit if there are changes
 if git diff --staged --quiet; then
   echo "ℹ️  No changes to commit."
 else

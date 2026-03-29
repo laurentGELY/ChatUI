@@ -190,6 +190,7 @@ No real Ollama or Piper needed — all external calls are mocked.
 ```
 ChatUI/
 ├── main.py                  # FastAPI application
+├── pipeline.sh              # Local dev pipeline (test → docs → git push)
 ├── requirements.txt         # Runtime dependencies
 ├── requirements-dev.txt     # Test dependencies (pytest)
 ├── pytest.ini               # Pytest configuration

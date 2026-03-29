@@ -14,6 +14,7 @@ from tests.conftest import make_ollama_response, make_show_response
 # ── /health ───────────────────────────────────────────────────────────────────
 
 class TestHealth:
+    """Tests for the ``GET /health`` endpoint."""
 
     def test_ollama_up(self, client, mock_http):
         resp = MagicMock()
@@ -37,6 +38,7 @@ class TestHealth:
 # ── /models ───────────────────────────────────────────────────────────────────
 
 class TestModels:
+    """Tests for the ``GET /models`` endpoint."""
 
     def test_returns_model_list(self, client, mock_http):
         resp = MagicMock()
@@ -59,6 +61,7 @@ class TestModels:
 # ── /prompts ──────────────────────────────────────────────────────────────────
 
 class TestPrompts:
+    """Tests for the ``GET /prompts`` endpoint."""
 
     def test_lists_txt_files(self, client, prompts_dir):
         r = client.get("/prompts")
@@ -75,6 +78,7 @@ class TestPrompts:
 # ── /voices ───────────────────────────────────────────────────────────────────
 
 class TestVoices:
+    """Tests for the ``GET /voices`` endpoint."""
 
     def test_lists_onnx_files(self, client, voices_dir):
         r = client.get("/voices")
@@ -94,6 +98,7 @@ class TestVoices:
 # ── /session/prompt ───────────────────────────────────────────────────────────
 
 class TestSessionPrompt:
+    """Tests for the ``POST /session/prompt`` endpoint."""
 
     def test_set_prompt_by_file(self, client):
         r = client.post("/session/prompt",
@@ -127,6 +132,7 @@ class TestSessionPrompt:
 # ── /reset ────────────────────────────────────────────────────────────────────
 
 class TestReset:
+    """Tests for the ``POST /reset`` endpoint."""
 
     def test_clears_conversation(self, client):
         sid = "reset-test-session"
@@ -147,6 +153,7 @@ class TestReset:
 # ── /export ───────────────────────────────────────────────────────────────────
 
 class TestExport:
+    """Tests for the ``GET /export`` endpoint."""
 
     def test_no_history_returns_404(self, client):
         r = client.get("/export", cookies={"session_id": "empty-session"})
@@ -179,6 +186,7 @@ class TestExport:
 # ── /send (blocking) ──────────────────────────────────────────────────────────
 
 class TestSend:
+    """Tests for the ``POST /send`` (blocking) endpoint."""
 
     def test_happy_path_redirects(self, client, mock_http):
         # /api/show for context size
@@ -229,6 +237,7 @@ class TestSend:
 # ── /stream (SSE) ─────────────────────────────────────────────────────────────
 
 class TestStream:
+    """Tests for the ``POST /stream`` (SSE) endpoint."""
 
     def _make_stream_mock(self, mock_http, tokens, prompt_tokens=15):
         """Configure mock_http.stream to yield the given tokens then done."""
@@ -307,6 +316,7 @@ class TestStream:
 # ── get_model_ctx ─────────────────────────────────────────────────────────────
 
 class TestGetModelCtx:
+    """Tests for the ``get_model_ctx`` async helper function."""
 
     @pytest.mark.asyncio
     async def test_reads_explicit_num_ctx(self, mock_http):

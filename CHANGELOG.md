@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 
 ---
 
+## [2026-03-28] — docs
+
+### Changed
+- Added Google-style docstrings to all test classes in `tests/test_routes.py`,
+  `tests/test_helpers.py`, and `tests/test_stt.py`.
+- Updated `client` fixture docstring in `tests/conftest.py` to proper Google
+  style (Args / Yields sections).
+- Added docstring to `make_audio_upload` helper in `tests/test_stt.py`.
+- Added `pipeline.sh` to the project structure listing in README.
+
+---
+
 ## [2.5.0] — 2026-03-28
 
 ### Added

@@ -7,6 +7,12 @@
 
 set -e  # stop on any error
 
+# Activate venv if it exists
+if [ -f ".venv/bin/activate" ]; then
+  echo ">>> Activating virtual environment..."
+  source .venv/bin/activate
+fi
+
 COMMIT_MSG=${1:-"auto: update docs and push"}
 
 echo ""

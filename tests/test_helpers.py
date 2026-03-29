@@ -9,6 +9,7 @@ from main import strip_markdown, build_messages
 # ── strip_markdown ────────────────────────────────────────────────────────────
 
 class TestStripMarkdown:
+    """Tests for the ``strip_markdown`` helper function."""
 
     def test_removes_bold(self):
         assert strip_markdown("**bold**") == "bold"
@@ -63,6 +64,7 @@ class TestStripMarkdown:
 # ── build_messages ────────────────────────────────────────────────────────────
 
 class TestBuildMessages:
+    """Tests for the ``build_messages`` helper function."""
 
     def test_starts_with_system_message(self, prompts_dir, monkeypatch):
         monkeypatch.setattr(app_module, "PROMPTS_DIR", prompts_dir)

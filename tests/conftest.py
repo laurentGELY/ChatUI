@@ -47,11 +47,20 @@ def mock_http():
 
 @pytest.fixture
 def client(prompts_dir, voices_dir, mock_http, monkeypatch):
-    """
-    Full TestClient with:
-    - isolated prompts and voices directories
-    - http_client replaced by an AsyncMock (no real Ollama needed)
-    - fresh conversation state
+    """Return a fully configured TestClient with isolated state.
+
+    Provides temporary prompts and voices directories and replaces the real
+    ``http_client`` with an ``AsyncMock`` so no Ollama server is needed.
+    All in-memory conversation state is cleared before each test.
+
+    Args:
+        prompts_dir: Temporary prompts directory fixture.
+        voices_dir: Temporary voices directory fixture.
+        mock_http: AsyncMock replacing ``main.http_client``.
+        monkeypatch: Pytest monkeypatch fixture.
+
+    Yields:
+        TestClient: Configured test client for the FastAPI app.
     """
     monkeypatch.setattr(app_module, "PROMPTS_DIR", prompts_dir)
     monkeypatch.setattr(app_module, "VOICES_DIR", voices_dir)

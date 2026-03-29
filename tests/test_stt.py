@@ -10,10 +10,21 @@ import main as app_module
 
 
 def make_audio_upload(content=b"fake-audio-data", filename="recording.webm"):
+    """Build a multipart file tuple for ``/stt`` upload tests.
+
+    Args:
+        content: Raw bytes to use as the fake audio data.
+        filename: Filename reported in the upload.
+
+    Returns:
+        A ``(field_name, (filename, file_obj, mime_type))`` tuple suitable
+        for passing to ``requests``/``httpx`` ``files=`` parameter.
+    """
     return ("audio", (filename, io.BytesIO(content), "audio/webm"))
 
 
 class TestSTT:
+    """Tests for the ``POST /stt`` (speech-to-text) endpoint."""
 
     def test_transcribes_audio(self, client):
         segment = MagicMock()
